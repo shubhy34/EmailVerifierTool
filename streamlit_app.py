@@ -1,4 +1,4 @@
-from serpapi.google_search import GoogleSearch
+from serpapi import GoogleSearch
 from bs4 import BeautifulSoup
 import requests
 import re
