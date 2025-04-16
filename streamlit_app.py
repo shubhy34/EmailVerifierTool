@@ -6,7 +6,7 @@ from serpapi import GoogleSearch
 import pandas as pd
 
 # 🔑 SerpAPI Key
-SERPAPI_KEY = "0a72b64bccab9ced37cbd5c071e9368b829facd6f6e0a7d42d3e89bf8c2f0d55"
+SERPAPI_KEY = "1a6f29e53ed520808f4e4f93ea42cb32751e0c6875a1216a776c7eeee340edc6"
 
 # Untrusted domains
 IGNORE_SITES = ['intelius.com', 'rocketreach.co', 'zoominfo.com', 'aeroleads.com']
