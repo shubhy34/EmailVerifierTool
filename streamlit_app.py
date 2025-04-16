@@ -5,19 +5,23 @@ from bs4 import BeautifulSoup
 from serpapi import GoogleSearch
 import pandas as pd
 
-# Set your SerpAPI key
+# 🔑 SerpAPI Key
 SERPAPI_KEY = "0a72b64bccab9ced37cbd5c071e9368b829facd6f6e0a7d42d3e89bf8c2f0d55"
 
-# List of untrusted and trusted domains
+# Untrusted domains
 IGNORE_SITES = ['intelius.com', 'rocketreach.co', 'zoominfo.com', 'aeroleads.com']
-TRUSTED_SOURCES = ['wikileaks.org', 'nytimes.com', 'media.']
+
+# Generic email usernames that shouldn't be considered executive patterns
+GENERIC_EMAILS = ["info", "contact", "admin", "support", "sales", "help"]
 
 def is_valid_source(url):
     return not any(site in url for site in IGNORE_SITES)
 
-def is_trusted_source(url):
-    return any(site in url for site in TRUSTED_SOURCES)
+def is_executive_email(email):
+    local_part = email.split('@')[0]
+    return all(not local_part.startswith(gen) for gen in GENERIC_EMAILS)
 
+@st.cache_data(ttl=3600)
 def fetch_search_results(query, num=10):
     params = {
         "q": query,
@@ -31,7 +35,10 @@ def fetch_search_results(query, num=10):
         links = []
         if "organic_results" in results:
             for result in results["organic_results"]:
-                links.append(result.get("link", ""))
+                links.append({
+                    "link": result.get("link", ""),
+                    "snippet": result.get("snippet", "")
+                })
         return links
     except Exception as e:
         st.error(f"Error fetching results: {e}")
@@ -41,16 +48,31 @@ def extract_domain(email):
     return email.split('@')[-1]
 
 def check_email_exact(email):
+    domain = extract_domain(email)
     results = fetch_search_results(f'"{email}"')
-    for url in results:
-        if is_valid_source(url) and is_trusted_source(url):
-            return "Verified (Trusted Source)"
+
+    for item in results:
+        url = item.get("link", "")
+        snippet = item.get("snippet", "")
+
+        if is_valid_source(url) and (email in url or email in snippet):
+            source = url
+            if domain in url:
+                return f"Verified (Source: {source}, Confidence: 100%)"
+            else:
+                return f"Verified (Source: {source})"
+
     return None
 
 def check_domain_pattern(email):
     domain = extract_domain(email)
-    results = fetch_search_results(f'"@{domain}"')
-    for url in results:
+    domain_query = f'"@{domain}"'
+    results = fetch_search_results(domain_query)
+
+    exec_emails_found = []
+
+    for item in results:
+        url = item["link"]
         if is_valid_source(url):
             try:
                 r = requests.get(url, timeout=10)
@@ -58,10 +80,15 @@ def check_domain_pattern(email):
                 found_emails = re.findall(r"[a-zA-Z0-9_.+-]+@" + re.escape(domain), soup.text)
                 found_emails = list(set(found_emails))
                 found_emails = [e for e in found_emails if e.lower() != email.lower()]
-                if found_emails:
-                    return f"Pattern Verified (Based on emails like: {', '.join(found_emails[:3])})"
+                exec_emails = [e for e in found_emails if is_executive_email(e)]
+                if exec_emails:
+                    exec_emails_found.extend(exec_emails)
             except:
                 continue
+
+    if exec_emails_found:
+        return f"Pattern Verified (Based on emails like: {', '.join(exec_emails_found[:3])})"
+
     return "Not Verified"
 
 def verify_email(email):
@@ -106,7 +133,7 @@ if emails:
         st.write("## ✅ Verification Results")
         st.dataframe(df_results)
 
-        csv = df_results.to_csv(index=False).encode('utf-8')
+        csv = df_results.to_csv(index=False)
         st.download_button("⬇️ Download Results", csv, "verification_results.csv", "text/csv")
 else:
     st.info("Enter at least one email address or upload a file.")
