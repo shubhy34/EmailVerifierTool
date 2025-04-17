@@ -6,7 +6,7 @@ from serpapi import GoogleSearch
 import pandas as pd
 
 # 🔑 SerpAPI Key
-SERPAPI_KEY = "7f613256d9f99b7ca4c2430fa24965e5f43960fcd6547405e63df23f461b3aec"
+SERPAPI_KEY = "0a72b64bccab9ced37cbd5c071e9368b829facd6f6e0a7d42d3e89bf8c2f0d55"
 
 # Untrusted domains
 IGNORE_SITES = ['intelius.com', 'rocketreach.co', 'zoominfo.com', 'aeroleads.com']
@@ -18,7 +18,7 @@ def is_valid_source(url):
     return not any(site in url for site in IGNORE_SITES)
 
 def is_executive_email(email):
-    local_part = email.split('@')[0]
+    local_part = email.split('@')[0].lower()
     return all(not local_part.startswith(gen) for gen in GENERIC_EMAILS)
 
 @st.cache_data(ttl=3600)
@@ -56,11 +56,10 @@ def check_email_exact(email):
         snippet = item.get("snippet", "")
 
         if is_valid_source(url) and (email in url or email in snippet):
-            source = url
             if domain in url:
-                return f"Verified (Source: {source}, Confidence: 100%)"
+                return f"Verified (Pattern: {email}, Source: {url}, Confidence: 100%)"
             else:
-                return f"Verified (Source: {source})"
+                return f"Verified (Pattern: {email}, Source: {url})"
 
     return None
 
@@ -82,12 +81,9 @@ def check_domain_pattern(email):
                 found_emails = [e for e in found_emails if e.lower() != email.lower()]
                 exec_emails = [e for e in found_emails if is_executive_email(e)]
                 if exec_emails:
-                    exec_emails_found.extend(exec_emails)
+                    return f"Pattern Verified (Based on: {', '.join(exec_emails[:3])}, Source: {url})"
             except:
                 continue
-
-    if exec_emails_found:
-        return f"Pattern Verified (Based on emails like: {', '.join(exec_emails_found[:3])})"
 
     return "Not Verified"
 
